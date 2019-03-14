@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Grid matrix</title>
+    <style>
+        #gridUl {
+            padding: 0;
+            margin: 10px auto;
+            overflow: hidden;
+            border-top: 1px solid #000;
+            border-right: 1px solid #000;
+        }
+
+        .gridLi {
+            float: left;
+            list-style: none;
+            border-bottom: 1px solid #000;
+            border-left: 1px solid #000;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <ul id="gridUl">
+    </ul>
+    <script>
+        function creatGrid() {
+            var oGrid = document.getElementById('gridUl');
+            var aGridLi = document.getElementsByTagName('li');
+            var matrixSize = 8;
+            var gridSize = 50;
+            var i = 0;
+
+            oGrid.style.width = matrixSize * (gridSize + 1) + 'px';
+
+            for (i = 0; i < (matrixSize * matrixSize); i++) {
+                var oGridLi = document.createElement('li');
+                oGridLi.style.width = gridSize + 'px';
+                oGridLi.style.height = gridSize + 'px';
+                oGridLi.style.lineHeight = gridSize + 'px';
+                oGridLi.className = 'gridLi';
+                oGridLi.x = Math.floor(i/matrixSize);
+                oGridLi.y = i%matrixSize;
+                oGrid.appendChild(oGridLi);
+                oGridLi.innerHTML = '('+oGridLi.x + '.' + oGridLi.y+')';
+            }      
+        }
+        
+        creatGrid();
+    </script>
+</body>
+
+</html>
