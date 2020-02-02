@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Document</title>
+  <script src="./bezier.js"></script>
+</head>
+
+<body>
+  <canvas id="canvas" style="border: 1px solid #ccc;"></canvas>
+
+  <script>
+    let config = {
+      width: 776, // 图表的宽度
+      height: 332, // 图表的高度
+      textHeight: 64, // 文字描述的高度
+      interval: 15, // 波纹的宽度 30
+      level: 2, // 波纹的层级 0 1 2
+      yData: [348, 16, 54, 25, 18, 5], // y轴值
+      rate: ['41%', '7%', '13%', '20%', '33%'],
+      xAxisMsg: ['简历入库', 'HR初筛', '面试官筛选', '预约面试', '发放offer', '员工入职'], // x轴描述
+      orignWidth: 34, // 水平方向的padding // 原点x值
+      levelColor: {
+        0: "rgba(36, 145, 245, 1)",
+        1: "rgba(151, 194, 244, 1)",
+        2: "rgba(204, 224, 255, 1)",
+      }, // 不同层级的颜色
+      yAxisColor: "rgba(255, 255, 255, 0.7)", // y轴颜色
+      dataStyle: {
+        font: "16px Helvetica Neue",
+        color: "rgba(25, 43, 81, 1)"
+      },
+      msgStyle: {
+        font: "12px Helvetica Neue",
+        color: "rgba(25, 43, 81, 1)"
+      }
+    }
+
+    let canvas = document.getElementById('canvas')
+    canvas.setAttribute('height', config['height'] + config['textHeight'])
+    canvas.setAttribute('width', config['width'])
+    let ctx = canvas.getContext('2d')
+
+    // 离屏渲染
+    let cacheCanvas = document.createElement('canvas')
+    cacheCanvas.setAttribute('height', (config['height'] + config['textHeight']))
+    cacheCanvas.setAttribute('width', config['width'])
+    let cacheCtx = cacheCanvas.getContext('2d')
+
+    // document.body.append(cacheCanvas)
+
+    let orignHign = config['height'] / 2 // 原点y值
+
+    // 高度自适应
+    let yDataDeal = []
+    config['yData'].forEach(item => {
+      item = item / (config['yData'][0] * 6 / 11) * (orignHign - config['interval'] * config['level'])
+      yDataDeal.push(item)
+    })
+
+    // y轴间距
+    let axisWidth = (config['width'] - config['orignWidth'] * 2) / (config['yData'].length - 1)
+
+    // 生成坐标数据
+    let data = []
+    yDataDeal.forEach((item, index) => {
+      let tmp = {}
+      if (index !== yDataDeal.length - 1) {
+        // 只能设两组，多了无效
+        tmp.x = config['orignWidth'] + axisWidth * index
+        tmp.y = item * 5 / 11 // 数据太大，而显示过高
+        data.push(tmp)
+        tmp = {}
+        tmp.x = config['orignWidth'] + axisWidth * index + axisWidth / 3
+        tmp.y = item * 6 / 11
+        data.push(tmp)
+      } else {
+        tmp.x = config['orignWidth'] + axisWidth * index
+        tmp.y = item
+        data.push(tmp)
+      }
+    })
+
+    // 为了中间闭合做的处理
+    data.push({
+      x: config['orignWidth'] + axisWidth * (config['yData'].length - 1) + 1,
+      y: 0
+    })
+
+    let dataLen = data.length
+    let zeroData = {
+      x: 0,
+      y: 0
+    } // 闭合专用
+    let bezierNodesArr = []
+    let bezier = {} // 贝塞尔对象
+    let bezierArr = [] // 贝塞尔数据 [[], [], [], [], []]
+    let levelColor = config['levelColor']
+
+    let repeatData = [] // 重复坐标，用来凸显数据变化
+    let repeatTime = 5 // 重复次数
+    data.forEach(item => {
+      for (let i = 0; i < repeatTime; i++) {
+        repeatData.push(item)
+      }
+    })
+
+    let direction = 1 // 1 上波 -1 下波
+    for (let d = direction; d >= -1; d -= 2) { // 画上下波
+      for (let i = config['level']; i >= 0; i--) { // 画波纹
+
+        bezierNodesArr = []
+        repeatData.forEach((item, index) => {
+
+          bezierNodesArr.push({
+            x: item.x,
+            y: orignHign - item.y * d + config['interval'] * d * -1 * i
+          })
+
+        })
+
+        zeroData = {
+          x: data[dataLen - 1].x,
+          y: orignHign,
+        }
+
+        // 重复是为了闭合，避免对称线出现缝隙
+        for (let j = 0; j <= i; j++) {
+          bezierNodesArr.push(zeroData, zeroData)
+        }
+
+        bezier = new Bezier(cacheCanvas, {
+          x: config['orignWidth'],
+          y: orignHign
+        }, bezierNodesArr, '#fff', levelColor[i])
+        // let tmp = bezier.getBezierArr()
+        // tmp.unshift(i) // 第一个位置记录所在层级
+        // bezierArr.push(tmp) // 存起来，避免大量重复计算
+        bezier.draw()
+      }
+    }
+
+    // 绘制图像
+    let xAxisPosition = [] // 存储横坐标的位置
+    draw()
+
+    // 解决模糊
+    // var getPixelRatio = function(context) {
+    //     var backingStore = context.backingStorePixelRatio ||
+    //         context.webkitBackingStorePixelRatio ||
+    //         context.mozBackingStorePixelRatio ||
+    //         context.msBackingStorePixelRatio ||
+    //         context.oBackingStorePixelRatio ||
+    //         context.backingStorePixelRatio || 1;
+    
+    //     return (window.devicePixelRatio || 1) / backingStore;
+    // };
+ 
+    // var ratio = getPixelRatio(ctx);
+    
+    // 注意，这里的 width 和 height 变成了 width * ratio 和 height * ratio
+    // ctx.drawImage(cacheCanvas, 0, 0, config['width'] * ratio, (config['height'] + config['textHeight']) * ratio);
+    ctx.drawImage(cacheCanvas, 0, 0)
+
+    // 鼠标移入事件
+    let position = {
+      x: 0,
+      y: 0
+    } // 记录上次鼠标移入的位置
+
+    canvas.onmousemove = onmouseMove
+    // canvas.onmouseout = () => {
+    //   canvas.onmousemove = null
+    // }
+
+    function throttle(e, fn, interval) {
+      let last = 0;
+      return () => {
+        let now = +new Date();
+        if (now - last >= interval) {
+          last = now;
+          fn(e);
+        }
+      }
+    }
+
+    function onmouseMove(e) {
+      xAxisPosition.forEach((item, index) => {
+        if (Math.abs(e.offsetX - item) < 10 && 16 < e.offsetY && e.offsetY < config['height']) {
+          if (Math.pow(e.offsetX - position.x, 2) + Math.pow(e.offsetY - position.y, 2) > 1250) {
+            clear()
+            ctx.drawImage(cacheCanvas, 0, 0)
+            position.x = e.offsetX
+            position.y = e.offsetY
+            drawToolTip(config['yData'][index] + '份', item, e.offsetY) // undefined ?
+          }
+        }
+      })
+    }
+
+    function draw() {
+
+      // 绘制主数据
+      // let start = {
+      //   x: config['orignWidth'],
+      //   y: orignHign
+      // }
+
+      // bezierArr.forEach((arr, index) => {
+      //   cacheCtx.beginPath()
+      //   cacheCtx.moveTo(start.x, start.y)
+      //   arr.forEach((item, i) => {
+      //     if (i) { // 第一个位置记录所在层级
+      //       cacheCtx.lineTo(item.x, item.y)
+      //     }
+      //   })
+      //   cacheCtx.fillStyle = levelColor[arr[0]]
+      //   cacheCtx.fill()
+      // })
+
+      // 绘制描述部份
+      let indexMsg = 0
+      let indexRate = 0
+      let indexData = 0
+      data.forEach((item, index) => {
+        if (index % 2 === 0 && index !== dataLen - 1) {
+          // 画轴线 
+          cacheCtx.beginPath() // 不加的话，会让波纹产生一条白曲线
+          cacheCtx.moveTo(item.x, config['height'])
+          cacheCtx.lineTo(item.x, 0)
+          cacheCtx.strokeStyle = config['yAxisColor']
+          cacheCtx.stroke()
+
+          // 画横轴的短横线
+          // cacheCtx.beginPath()
+          // cacheCtx.moveTo(item.x, config['height'] - 50)
+          // cacheCtx.lineTo(item.x, config['height'] - 40)
+          // cacheCtx.strokeStyle = "#000"
+          // cacheCtx.stroke()
+
+          // 绘制数据
+          // cacheCtx.font = config['dataStyle']['font']
+          // cacheCtx.fillStyle = config['dataStyle']['color']
+          // cacheCtx.fillText(config['yData'].shift(), item.x - 10, orignHign + 8);
+
+          // 绘制横坐标轴描述
+          cacheCtx.font = config['msgStyle']['font']
+          cacheCtx.fillStyle = config['msgStyle']['color']
+          cacheCtx.fillText(config['xAxisMsg'][indexMsg++], item.x - 20, config['height'] + config['textHeight'] /
+            3 *
+            2)
+          cacheCtx.fillText(config['yData'][indexData++] + '份', item.x - 20, config['height'] + config[
+            'textHeight'] / 3 *
+            2 + 16)
+
+          xAxisPosition.push(item.x)
+
+        } else if (index % 2 === 1 && index !== dataLen - 1) {
+          // 绘制rate
+          cacheCtx.font = config['dataStyle']['font']
+          cacheCtx.fillStyle = config['dataStyle']['color']
+          cacheCtx.fillText(config['rate'][indexRate++], item.x, orignHign + 4);
+        }
+      })
+
+      // 画横坐标轴
+      // cacheCtx.strokeStyle = "#000"
+      // cacheCtx.beginPath()
+      // cacheCtx.moveTo(config['orignWidth'], config['height'] - 50)
+      // cacheCtx.lineTo(config['orignWidth'] + axisWidth * (data.length - 3), config['height'] - 50)
+      // cacheCtx.stroke()
+    }
+
+    // 清空画布
+    function clear() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+    }
+
+    // 绘制文字提示
+    function drawToolTip(txt, x, y) {
+      let padding = 8
+      let font = "16px arial"
+      ctx.font = font
+      ctx.textBaseline = 'bottom'
+      ctx.fillStyle = '#00000095'
+
+      //绘制ToolTip背景
+      let width = ctx.measureText(txt).width
+      let height = parseInt(font, 10)
+      ctx.fillRect(x - (width + padding) / 2, y - height, width + padding * 2, height + padding * 2)
+
+      //绘制ToolTip文字
+      ctx.fillStyle = '#fff'
+      ctx.fillText(txt, x - (width + padding) / 2 + padding, y + padding)
+    }
+  </script>
+</body>
+
+</html>
